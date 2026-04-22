@@ -48,6 +48,9 @@ def main(args: argparse.Namespace) -> None:
     model, tokenizer = build_model_and_tokenizer(args.model_name, device)
     peft_config = build_lora_config(args)
 
+    use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+    use_fp16 = torch.cuda.is_available() and not use_bf16
+
     training_args = SFTConfig(
         output_dir=args.output_dir,
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -61,7 +64,8 @@ def main(args: argparse.Namespace) -> None:
         weight_decay=args.weight_decay,
         warmup_steps=args.warmup_steps,
         lr_scheduler_type=args.lr_scheduler_type,
-        bf16=True,
+        bf16=use_bf16,
+        fp16=use_fp16,
         logging_dir=os.path.join(args.output_dir, "logs"),
         report_to="none",
         completion_only_loss=True,

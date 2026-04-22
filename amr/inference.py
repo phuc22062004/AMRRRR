@@ -33,11 +33,15 @@ class QwenReasoner:
     ):
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Câu: {prompt}"},
+            {"role": "user", "content": f"Sentence: {prompt}"},
         ]
-        text = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
+        template_kwargs = {"tokenize": False, "add_generation_prompt": True}
+        try:
+            text = self.tokenizer.apply_chat_template(
+                messages, enable_thinking=is_thinking, **template_kwargs
+            )
+        except TypeError:
+            text = self.tokenizer.apply_chat_template(messages, **template_kwargs)
         model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
         generated_ids = self.model.generate(**model_inputs, max_new_tokens=max_new_tokens)
 
