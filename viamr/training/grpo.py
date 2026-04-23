@@ -51,9 +51,11 @@ def main(args: argparse.Namespace) -> None:
         max_prompt_length=args.max_prompt_length,
         max_completion_length=args.max_completion_length,
         num_train_epochs=args.num_train_epochs,
+        max_steps=args.max_steps,
         save_steps=args.save_steps,
         save_total_limit=args.save_total_limit,
         log_on_each_node=args.log_on_each_node,
+        temperature=args.temperature,
         use_vllm=False,
         vllm_gpu_memory_utilization=0.6,
         report_to=report_to,
@@ -92,6 +94,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num_generations", type=int, default=4)
     parser.add_argument("--max_prompt_length", type=int, default=2048)
     parser.add_argument("--max_completion_length", type=int, default=1024)
+    parser.add_argument("--max_steps", type=int, default=-1)
+    parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--log_on_each_node", action="store_true")
     parser.add_argument("--wandb_project", type=str, default="viamr")
     parser.add_argument("--wandb_run_name", type=str, default="grpo-run")

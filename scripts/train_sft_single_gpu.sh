@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 echo "Running SFT training (Single GPU) with eval + early stopping..."
 
-python -m amr.training.sft \
+python -m viamr.training.sft \
     --dataset1_path "data/train.amr" \
     --eval_dataset_path "data/dev.amr" \
     --output_dir "outputs/Qwen-1.5B-SFT" \

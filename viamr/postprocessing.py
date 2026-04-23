@@ -73,6 +73,85 @@ def dedup_selected_roles(amr: str, roles=()):
     return rx.sub(_sub, amr)
 
 
+def dedup_vars(amr: str) -> str:
+    """Rename duplicate variable names so each variable is unique.
+
+    When the model produces AMR with two nodes sharing the same variable
+    (e.g. two ``(n / ...)``) the smatch scorer cannot parse the graph and
+    returns 0.  This function renames the *second* (and subsequent)
+    occurrences by appending an incrementing digit, both at the definition
+    site ``(var / concept)`` and at every reference site.
+    """
+    # 1. Find all definition sites and identify duplicates.
+    def_pat = re.compile(r'\(\s*([A-Za-z]\w*)\s*/')
+    definitions = def_pat.findall(amr)
+    if len(definitions) == len(set(definitions)):
+        return amr  # no duplicates
+
+    # 2. Build a rename map: for each duplicate occurrence (2nd, 3rd, …)
+    #    assign a new unique name.
+    all_vars = set(definitions)
+    seen: dict[str, int] = {}
+    rename_map: list[tuple[int, str, str]] = []  # (occurrence_index, old, new)
+    occurrence_index = 0
+    for var in definitions:
+        count = seen.get(var, 0)
+        seen[var] = count + 1
+        if count > 0:
+            # Find a name that doesn't collide.
+            suffix = count
+            new_var = f"{var}{suffix}"
+            while new_var in all_vars:
+                suffix += 1
+                new_var = f"{var}{suffix}"
+            all_vars.add(new_var)
+            rename_map.append((occurrence_index, var, new_var))
+        occurrence_index += 1
+
+    # 3. Walk definition sites in order and apply renames.
+    #    For each renamed definition we also rename all *references* to that
+    #    variable that appear between this definition and the next definition
+    #    of the same original variable (i.e. within the subtree scope).
+    # Strategy: process the string by splitting at definition sites.
+    parts: list[str] = []
+    last_end = 0
+    def_positions: list[tuple[int, int, str]] = []  # (start, end, var)
+    for m in def_pat.finditer(amr):
+        def_positions.append((m.start(), m.end(), m.group(1)))
+
+    rename_by_idx = {r[0]: r for r in rename_map}
+
+    for idx, (start, end, var) in enumerate(def_positions):
+        # Text before this definition (or between previous def and this one)
+        between = amr[last_end:start]
+
+        # Apply pending reference renames to the "between" text.
+        # References to renamed vars that were defined *before* this point.
+        for prev_idx, old, new in rename_map:
+            if prev_idx < idx:
+                # Replace references: word-boundary match, but NOT at def sites
+                between = re.sub(rf'(?<!\()\b{re.escape(old)}\b(?!\s*/)', new, between)
+
+        parts.append(between)
+
+        # The definition site itself
+        if idx in rename_by_idx:
+            _, old, new = rename_by_idx[idx]
+            parts.append(amr[start:end].replace(old, new, 1))
+        else:
+            parts.append(amr[start:end])
+
+        last_end = end
+
+    # Remaining text after last definition
+    tail = amr[last_end:]
+    for prev_idx, old, new in rename_map:
+        tail = re.sub(rf'(?<!\()\b{re.escape(old)}\b(?!\s*/)', new, tail)
+    parts.append(tail)
+
+    return ''.join(parts)
+
+
 def penman_safe_minimal(amr: str, roles_to_dedup=()) -> str:
     """Minimal sanitization pipeline for AMR/PENMAN strings."""
     s = amr
@@ -80,6 +159,7 @@ def penman_safe_minimal(amr: str, roles_to_dedup=()) -> str:
     s = join_concepts_underscores(s)
     s = fix_amr_vars(s)
     s = strip_orphan_slashes(s)
+    s = dedup_vars(s)
     s = balance_parens(s)
     if roles_to_dedup:
         s = dedup_selected_roles(s, roles=roles_to_dedup)
