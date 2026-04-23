@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 echo "Validating ViAMR dataset splits in ./data ..."
 python - <<'PY'
-from amr.data_processing import read_amr_direct
+from viamr.data_processing import read_amr_direct
 
 for split in ("train", "dev", "test"):
     path = f"data/{split}.amr"
